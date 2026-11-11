@@ -1,0 +1,110 @@
+# Parámetros de la validación de anotaciones. Las rutas relativas se resuelven desde etiquetado/.
+rutas:
+  procesamiento: ../procesamiento_videos   # módulo cuyas salidas (tracklets, trayectorias) sirven de referencia
+  salidas: salidas
+  correcciones: config/correcciones_{anotador}.csv   # correcciones fila por fila de cada anotador, cada una con su evidencia
+  entrega_validacion: ../datos/validacion_oficial   # carpeta de entrega de los clips; ajustar a la ubicación local
+
+validacion:
+  infracciones: [G08, G10, G41, M21]
+  zona_carril: carril_explusivo_corredor   # zona de G10 (nombre con la errata original de zonas.json)
+  zona_crucero: paso_peatonal_1            # zona de G41: el único crucero dentro del área de reconocimiento
+  # Reasignación del video de un bloque: se aplica solo si menos de la mitad de sus G10 entran al
+  # carril en el video escrito y al menos 80 % entran en otro. Ejemplo: un bloque rotulado
+  # "2026-04-01_tarde_h3" dio 9 de 93 en ese video y 92 de 93 en 2026-04-01_manana_h2.
+  min_frac_g10_en_carril: 0.8
+  min_ids_para_reasignar: 10               # con menos IDs la fracción no es concluyente
+  desfases_sugeridos_min: [-60, 60, -30, 30]   # sugerencias para horas imposibles: hora o decena de minutos mal digitada
+  desfases_sugeridos_s: [-10, 10]          # decena de los segundos mal digitada
+  max_continuacion_s: 5                   # un evento que termina hasta 5 s después del último cuadro sigue en la hora siguiente
+  min_cuadros_detenido: 30                # 2 s a 15 fps: duración mínima de una detención del estudio
+  max_duracion_s: 600                     # una sugerencia que deja un intervalo mayor a 10 min se descarta
+  min_frac_en_vida: 0.5                   # una corrección de hora se sugiere si al menos la mitad del intervalo cae en la vida del ID; gana la de mayor fracción
+  tolerancia_bordes_s: 1                  # la hora anotada tiene resolución de 1 s: se acepta 1 s antes del primer cuadro o después del último
+  min_cuadros_carril: 7                   # regla de G10: al menos 7 fotogramas con el punto de contacto en el carril
+  max_frac_bus: 0.5                       # un tracklet es bus si la mitad o más de sus cuadros son bus
+  umbral_detenido: 0.02                   # umbral de movimiento, en alturas de caja por fotograma
+  max_hueco_detencion: 3                  # fotogramas sin detección admitidos dentro de una detención
+  ventana_vecinos_s: 20                   # margen alrededor de las filas vecinas al buscar el ID que se quiso escribir
+  acciones_g08:                            # columna Acción del Excel -> tipo de evento del protocolo
+    SUBE: ascenso
+    BAJA: descenso
+    BAJA/SUBE: ambos
+    SUBE/BAJA: ambos
+    SUBIDA: ascenso                       # variante usada por otra anotador
+    BAJADA: descenso
+    SUBIDA/BAJADA: ambos
+    BAJADA/SUBIDA: ambos
+  horas_vacias: ['-', '--', '—', 'NA', 'N/A', 'x', 'X']   # marcas que usan las anotadores para «sin hora»
+
+clips_validacion:
+  semilla: 20261106              # orden aleatorio reproducible de los clips
+  resolucion: [1280, 720]        # cuadro completo reducido: se ve toda la escena y el reloj de la cámara; ~0,87 MB/s en H.264
+  codec: avc1
+  fraccion_controles: 0.2        # 1 de cada 5 clips es un vehículo sin etiqueta: el validador no puede suponer que todo es infracción
+  margen_antes_s: 3              # contexto antes y después del tramo anotado
+  margen_despues_s: 3
+  max_evento_s: 20               # detenciones largas (G41 dura una mediana de 67 s) se muestran 20 s: basta para ver que está detenido y evita que el largo delate la infracción
+  min_clip_s: 8
+  juntar_si_separacion_s: 5      # etiquetas del mismo vehículo separadas por menos de 5 s van en un solo clip
+  mantener_caja_s: 1             # si el seguimiento pierde al vehículo, la marca se mantiene hasta 1 s
+  margen_caja_px: 6
+  color_bgr: [255, 0, 255]       # magenta: no se confunde con la pintura de la vía (blanca y amarilla) ni con el rojo del corredor
+  grosor: 3
+  zoom_px: 320                   # recuadro ampliado del vehículo marcado (lado en px del clip de 1280x720)
+  zoom_factor_caja: 2.5          # la ampliación muestra 2,5 veces el lado mayor de la caja: el vehículo y lo que pasa a su alrededor (personas que suben o bajan)
+  zoom_min_px: 90                # lado mínimo de la región ampliada: con vehículos lejanos se amplía hasta ~3,5 veces
+  escala_texto: 0.8
+  margen_texto_px: 16
+  zona_carril: carril_explusivo_corredor
+  zona_crucero: paso_peatonal_1
+  vel_ventana: 7                 # velocidad como en procesamiento_videos (mediana móvil de 7 cuadros)
+  vel_min: 3
+  umbral_detenido: 0.02          # umbral de movimiento, en alturas de caja por fotograma
+  min_cuadros_detenido: 30       # 2 s a 15 fps: la duración mínima de una detención del estudio
+  min_cuadros_control: 30
+  distancia_crucero_px: 150      # control "detenido antes del crucero": a menos de 150 px del borde, sin pisarlo
+  distancia_carril_px: 80        # control "junto al carril": pasa a menos de 80 px del carril exclusivo sin entrar
+
+candidatos:                      # señales de detención, cajas falsas, posición y tránsito (Etapa 3)
+  zona_carril: carril_explusivo_corredor
+  zona_crucero: paso_peatonal_1
+  ventana_contacto: 5            # punto de contacto suavizado con mediana móvil de 5 fotogramas
+  ventana_vel: 7                 # velocidad suavizada con mediana móvil de 7 fotogramas
+  umbral_vel: 0.02               # en movimiento si la velocidad es >= 0,02 alturas por fotograma (entre los dos grupos del histograma)
+  radio_D: 0.178                 # radio D de la detención estricta: valle del desplazamiento máximo en 2 s
+  duracion_S: 2                  # duración mínima S de la detención estricta (convención)
+  max_hueco: 3                   # fotogramas consecutivos sin detección admitidos
+  min_cuadros_obs: 10            # al menos 10 fotogramas dentro del área de reconocimiento
+  frac_quieto_falsa: 0.95        # caja falsa: al menos el 95 % de sus fotogramas a menos de D de su posición mediana...
+  radio_sitio_falsa_px: 20       # ...y otra caja así a menos de 20 px de ese lugar
+  min_repeticiones_falsa: 1
+  ventana_transito_s: 5          # estado del tránsito suavizado con media móvil de 5 s
+  theta_transito: 0.455          # umbral θ del estado del tránsito (método de Otsu)
+  delante_altos: 1.5             # otra detención simultánea hasta 1,5 alturas por delante (más cerca de la cámara)...
+  delante_lateral_altos: 0.6     # ...con un desplazamiento lateral menor de 0,6 alturas
+  margen_persona_altos: 0.5      # persona que aparece o desaparece con los pies en la caja ampliada 0,5 alturas
+  holgura_persona: 15            # cuadros antes y después de la detención en que se cuenta la aparición o desaparición
+  min_cuadros_carril: 7
+  max_frac_bus: 0.5
+
+
+muestra_validacion:
+  # Plan de muestreo de aceptación por atributos para el validador externo (src/muestra_validacion.py)
+  infracciones: [G10, G41, G08, M21]
+  p0: 0.05                 # proporción de etiquetas erróneas que no se acepta (calidad límite, LTPD)
+  alfa: 0.05               # riesgo de aceptar un estrato con error >= p0 (95 % de confianza)
+  c: 1                     # errores admitidos en la muestra; con c = 0 un solo caso ambiguo rechaza el estrato
+  semilla: 20261107
+  g41_control_borde_px: 20 # controles G41: detenciones sin etiqueta con el frente a menos de 20 px del crucero o dentro
+  horas_nuevas:            # anotaciones válidas de horas que se suman a las etiquetas finales
+    anotador_a2: [2026-04-01_tarde_h2, 2026-04-06_tarde_h2]
+  videos: [2026-04-01_manana_h2, 2026-04-01_manana_h3, 2026-04-01_tarde_h2, 2026-04-01_tarde_h3,
+           2026-04-06_manana_h2, 2026-04-06_manana_h3, 2026-04-06_tarde_h2, 2026-04-06_tarde_h3]
+  entrega: "../datos/validacion_oficial_v2"   # ajustar a la ubicación local
+
+consolidado:
+  anotadores:              # carpeta en salidas/ -> videos que aporta ("todos" o una lista)
+    anotador_a: todos
+    anotador_b: todos
+    anotador_a2: [2026-04-01_tarde_h2, 2026-04-06_tarde_h2]   # segundo libro: se usan solo estas dos horas, las demás hojas repiten las de "anotador_a"

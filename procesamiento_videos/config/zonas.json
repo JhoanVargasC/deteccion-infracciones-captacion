@@ -1,0 +1,16 @@
+{
+  "fuente": "Editor de ROI, base roi/config",
+  "version_base": 2,
+  "guardado_en_editor": "2026-09-12T02:06:14.592Z",
+  "copiado_a_disco": "2026-09-11",
+  "nota": "Coordenadas en píxeles de 1920x1080. La zona del carril de detección se guarda con el nombre area_de_deteccion2.",
+  "frame_size": [1920, 1080],
+  "zones": [
+    {"label": "area_de_deteccion", "points": [[539,257],[534,606],[4,553],[4,1079],[1916,1079],[1918,411],[1568,317],[1412,281],[1181,429],[746,253],[541,257]]},
+    {"label": "paso_peatonal_1", "points": [[649,571],[742,568],[841,571],[944,571],[1047,568],[1140,571],[1233,565],[1265,562],[1483,703],[1226,722],[1072,735],[908,752],[813,761],[710,774],[682,778],[651,575]]},
+    {"label": "paso_peatonal_2", "points": [[1408,567],[1630,683],[1916,608],[1735,524],[1406,567]]},
+    {"label": "paso_peatonal_3", "points": [[671,1078],[557,782],[292,757],[270,1076]]},
+    {"label": "carril_explusivo_corredor", "points": [[574,262],[613,254],[820,570],[645,577],[574,266]]},
+    {"label": "area_de_deteccion2", "points": [[543,253],[757,248],[1565,660],[1816,801],[532,900],[543,253]]}
+  ]
+}

@@ -1,0 +1,102 @@
+# Parámetros del procesamiento de videos (detección, seguimiento, recortes y video anotado).
+# Es el único lugar con valores numéricos y rutas.
+# Las rutas relativas se resuelven desde la carpeta procesamiento_videos.
+
+rutas:
+  videos_entrada: ../datos/videos            # videos originales, solo lectura; ajustar a la ubicación local
+  indice_videos: datos/indice_videos.csv     # una fila por video: sesión, hora, cuadros, fps, hora de inicio
+  lecturas_reloj: datos/lecturas_reloj.csv   # lectura manual del reloj en pantalla (ver docs/convenciones.md)
+  zonas: config/zonas.json                   # polígonos de las zonas de la escena
+  modelo: modelos/yolo26m.pt                 # pesos de YOLO26m (no incluidos en el repositorio)
+  salidas: salidas
+  registros: registros
+  temporal: temporal
+  cuaderno: docs/cuaderno_corridas.md
+  salidas_secundaria: ../datos/salidas_secundaria   # unidad secundaria (FAT32) para el video anotado; ajustar a la ubicación local
+
+almacenamiento:
+  # El video anotado de cada hora puede moverse a una unidad secundaria al terminar, para liberar el disco
+  # principal, donde quedan los recortes.
+  mover_video_anotado: true
+  max_archivo_gb_secundario: 4.0      # FAT32 no admite archivos de 4 GiB (4,29 GB) o más; un video mayor se queda en el disco principal
+  libre_minimo_gb_principal: 12       # por hora de video, antes de recortarlo: hasta 7 GB de recortes (noche) + 2,8 GB de video + margen
+  libre_minimo_gb_absoluto: 2         # piso para los videos cortos
+  libre_minimo_gb_secundario: 1
+  espera_segundos: 60                 # cada cuánto el proceso de recortes revisa si la detección del video terminó
+  espera_max_horas: 3                 # si la detección de un video no termina en ese tiempo, el proceso de recortes se detiene
+
+indice:
+  # Patrón del final del nombre de archivo: _AAAA-MM-DD_HH-MM-SS(N).mp4. La fecha y hora son
+  # el inicio de la sesión; N es la hora dentro de la sesión.
+  patron_nombre: '_(\d{4}-\d{2}-\d{2})_(\d{2})-(\d{2})-(\d{2})\((\d+)\)\.mp4$'
+  extension: .mp4
+  hora_corte_tarde: 12        # una sesión que empieza a las 12 h o después es "tarde"; las reales empiezan 06:57 y 16:57
+  # Con el reloj, las horas completas dan 15,0006 a 15,0008 fps; el contenedor declara hasta 15,0037.
+  # El error de la lectura es de +-0,0006 fps en una hora, así que se usa el reloj.
+  fuente_fps: reloj
+
+video:
+  resolucion: [1920, 1080]    # ancho, alto; coincide con zonas.json["frame_size"]
+  registrar_cada_cuadros: 9000   # 10 min de video a 15 fps: frecuencia de las líneas de avance en el registro
+
+zonas:
+  area: area_de_deteccion2    # zona del flujo vehicular dentro de zonas.json
+  # Rectángulo envolvente esperado (x, y, ancho, alto). Se calcula del polígono; este valor solo
+  # sirve para comprobar que zonas.json no cambió (1.285 x 653 px).
+  rectangulo_esperado: [532, 248, 1285, 653]
+
+deteccion:
+  dispositivo: directml       # GPU AMD RX 5600 XT; requiere src/compat_directml.py antes de Ultralytics
+  imgsz: 1280                 # yolo26m a 1280, un solo pase por cuadro para todas las clases
+  # Clases COCO en un solo pase: persona 0, bicicleta 1, auto 2, moto 3, bus 5, camión 7.
+  # 1 y 3 sirven para reconocer a quien va en ellas; 7 solo para auditoría.
+  clases: [0, 1, 2, 3, 5, 7]
+  conf_guardado: 0.05         # umbral bajo: no hubo falsos positivos de persona por encima de 0,05; el seguimiento filtra después
+  enmascarar_fuera_del_area: true
+  relleno_mascara: 114        # gris con que Ultralytics completa el letterbox; se comparó con negro
+  nms_ultralytics: false      # YOLO26 es end2end (sin NMS clásico); el NMS clásico falla en DirectML
+  bloque_escritura: 500       # cuadros por bloque escrito a disco; con reanudación se pierde como máximo un bloque
+
+seguimiento:
+  clases_vehiculo: [2, 5]     # auto y bus: unidades del corpus
+  clases_persona: [0]
+  nms_iou: 0.7                # supresión de duplicados por familia
+  ocupantes:                  # persona vista por el parabrisas = ocupante, se descarta
+    ioa_min: 0.9              # intersección sobre el área de la persona
+    margen_pie: 0.15          # los pies deben quedar por encima del borde inferior del vehículo menos 0,15 altos
+    conf_vehiculo: 0.25       # solo vehículos con conf >= 0,25 sirven de referencia para descartar ocupantes
+  tracker: tracktrack.yaml    # TrackTrack de Ultralytics 8.4.147
+  tracker_ajustes:            # con los valores por defecto (nuevo track con 0,7) el 25 % de las personas con conf >= 0,3 quedaba sin trayectoria
+    new_track_thresh: 0.4
+    track_low_thresh: 0.05
+    track_high_thresh: 0.3
+    track_buffer: 60          # cuadros que se conserva una pista perdida (4 s a 15 fps)
+
+recortes:
+  min_segundos_en_area: 1.0   # se descartan tracklets con menos de 1 s con el punto de apoyo dentro del área
+  cada_k_cuadros: 5           # un recorte cada 1/3 s; cada 3 cuadros pedía ~14 GB para 3 horas
+  margen_altos: 0.7           # 0,7 altos de la caja por lado dejan dentro el 98,5 % de la evidencia
+  calidad_jpeg: 90            # sin reducir el tamaño: a 512 px el ahorro era solo del 4 %
+  umbral_otro_vehiculo: 0.5   # otro vehículo con >= 50 % de su caja dentro del recorte
+  pct_bus_minimo: 50          # el tracklet es "bus" si >= 50 % de sus cuadros son bus
+  # Velocidad: desplazamiento del centro de la caja por cuadro, en altos de la caja, con mediana
+  # móvil centrada. Junto con "detenido" son rasgos del modelo de trayectoria.
+  vel_ventana_filas: 7
+  vel_min_filas: 3
+  umbral_detenido: 0.02       # valle entre los dos modos de la distribución de velocidad
+
+video_anotado:
+  generar: true               # video anotado completo de todas las horas, para el etiquetado manual
+  codec: avc1                 # H.264; en 10 s pesó 7,9 MB frente a 13,2 MB de mp4v, y fue más rápido
+  atenuar_fuera_del_area: true
+  factor_atenuacion: 0.45     # brillo de lo que YOLO no ve
+  grosor_caja: 1
+  escala_texto_id: 0.4
+  escala_texto_hud: 0.5
+  grosor_borde_hud: 3
+  relleno_etiqueta: 4         # píxeles alrededor del texto del ID
+  opacidad_leyenda: 0.45
+  colores_bgr:
+    auto: [60, 200, 60]
+    bus: [255, 170, 40]
+    persona: [40, 140, 255]

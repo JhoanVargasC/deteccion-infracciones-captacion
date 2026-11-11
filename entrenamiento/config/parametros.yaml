@@ -1,0 +1,100 @@
+# Parámetros del módulo de entrenamiento y evaluación (Etapas 2 a 5 de la metodología).
+# Las rutas relativas se resuelven desde entrenamiento/. Ajustar las rutas de datos a la ubicación local.
+rutas:
+  procesamiento: ../procesamiento_videos
+  etiquetado: ../etiquetado
+  dataset: ../datos/dataset         # tablas por infracción, particiones y manifiesto de recortes
+  resultados: ../datos/resultados   # métricas y predicciones
+  rasgos: ../datos/rasgos           # vectores de interacción y de apariencia de G08
+  registros: registros              # salida de cada paso de correr.py
+  carriles: config/carriles.json    # carriles del acceso trazados sobre la imagen (contexto del carril, M21)
+  verificacion_m21: ../datos/verificacion_m21   # clips y hoja de la revisión visual de M21
+
+dataset:
+  bloque_min: 10        # tramos de 10 minutos (partición de G08)
+  n_folds: 5            # el tramo b va a la partición b mod 5 (P0 a P4)
+  # Dos tracklets contiguos de un mismo vehículo (el segundo empieza a lo sumo 60 fotogramas después y a menos
+  # de una altura de caja de donde terminó el primero) se asignan a la partición del primero.
+  fragmento_max_cuadros: 60
+  fragmento_max_altos: 1.0
+  # Hora sin eventos de captación: el análisis de G08 comprende las otras siete horas.
+  excluir_videos:
+    G08: [2026-04-06_tarde_h2]
+
+validacion:
+  muestra_recortes: 2000        # recortes elegidos al azar para comprobar que existen y se leen
+  semilla: 20261107
+  min_positivos_por_fold: 1
+
+reglas:
+  bootstrap: 2000               # réplicas del bootstrap percentil (intervalos al 95 %)
+  G41:
+    umbral_profundidad: 0.0     # el frente sobrepasa el borde del crucero: distancia > 0
+  G10:
+    min_cuadros_carril: 7       # al menos 7 fotogramas en el carril exclusivo
+
+g08:
+  particiones_test: [3, 4]      # P3 y P4 forman el conjunto test; P0 a P2, el conjunto train
+  # Ventanas
+  instantes_por_ventana: 6      # 6 instantes de muestreo (un recorte cada 5 fotogramas), unos 2 s
+  paso_instantes: 3             # cada ventana empieza 1 s después de la anterior
+  margen_evento_s: 1.0          # margen alrededor del evento anotado (entrenamiento y localización)
+  contaminado_frac_caja: 0.5    # recorte de un automóvil sin evento que muestra el evento de un vecino
+  # Interacción
+  margen_proximidad_altos: 0.5  # caja del automóvil ampliada 0,5 alturas
+  ioa_proximidad: 0.5           # al menos el 50 % de la caja de la persona dentro de la caja ampliada
+  ioa_rodado: 0.3               # conductor de moto o bicicleta: >= 30 % de su caja sobre el vehículo...
+  frac_rodado: 0.3              # ...durante >= 30 % de su tracklet
+  conf_rodado: 0.25             # confianza mínima de las detecciones de moto y bicicleta usadas para esa regla
+  clases_rodado: [1, 3]         # COCO: bicicleta y motocicleta
+  ventana_extremos_cuadros: 2   # apariciones y desapariciones contadas hasta 2 fotogramas antes o después del instante
+  min_duracion_persona_s: 1.0   # apariciones filtradas: tracklets de al menos 1 s...
+  min_borde_area_px: 15         # ...que empiezan o terminan a 15 px o más del borde del área
+  fragmento_persona_s: 4.0      # variante con apariciones netas (comparada en la selección de la configuración)
+  dvel_s: 1.0                   # cambio de velocidad en 1 s
+  umbral_detenido: 0.02         # umbral de movimiento (alturas de caja por fotograma)
+  # Apariencia
+  codificador: vit_small_patch14_dinov2.lvd142m   # DINOv2 ViT-S/14 (timm), sin modificar sus parámetros
+  lado: 224
+  dispositivo: directml
+  lote: 64
+  hilos_lectura: 6
+  # Rama de apariencia
+  dim_modelo: 128
+  cabezas: 4
+  dim_perceptron: 256
+  dropout_proyeccion: 0.25
+  dropout_temporal: 0.10
+  epocas: 30
+  tam_lote: 128
+  semillas: [0, 1, 2, 3, 4]
+  tasa_aprendizaje: 0.001
+  decaimiento: 0.01
+  negativos_por_positivo: 8     # 4 del mismo automóvil, 2 de automóviles parecidos y 2 del resto
+  composicion_negativos: {mismo_auto: 4, parecidos: 2, resto: 2}
+  epoca_dificiles: 10           # ejemplos difíciles: desde la época 10...
+  cada_epocas_dificiles: 5      # ...cada 5 épocas...
+  frac_dificiles: 0.05          # ...entre el 5 % de ventanas sin evento con mayor puntaje
+  peso_positivo: 8              # entropía cruzada binaria con peso 8 para la clase positiva
+  parecidos_radio_altos: 1.0    # automóvil parecido: detenido a menos de 1 altura...
+  parecidos_max_min: 10         # ...y 10 minutos de un automóvil con evento
+  muestra_normalizacion: 20000  # instantes de train usados para estandarizar la entrada de apariencia
+  dispositivo_modelo: cpu
+  # Rama de interacción: HistGradientBoostingClassifier con los valores por defecto de scikit-learn.
+  fusion:
+    paso_rejilla: 0.05          # valores de α evaluados: 0; 0,05; ...; 1
+  alertas_por_hora: 20          # umbral de alerta τ: 20 alertas por hora en train
+
+iluminacion:
+  franja_cielo_px: 120          # filas superiores del fotograma (cielo y fachadas)
+  cuadros_por_bloque: 3
+  min_segundos_bloque: 60
+
+m21:
+  # Condiciones de la regla de M21 que dependen del contexto (las demás están en etiquetado/config).
+  rumbo_s: 3                    # dirección de avance en los 3 s anteriores y posteriores a la detención
+  carril_largo_altos: 5.0       # vehículo detenido delante en su carril: entre 0,3 y 5 alturas
+  vecinos_altos: 3.0            # carriles contiguos: vehículos a menos de 3 alturas
+  vecinos_min_en_marcha: 0.5    # los carriles contiguos están en movimiento si lo está al menos la mitad
+  giro_grados: 45               # cambio de rumbo de 45° o más...
+  cruce_px: 150                 # ...con el frente a menos de 150 px del borde del crucero

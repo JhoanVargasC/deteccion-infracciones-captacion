@@ -1,0 +1,15 @@
+__pycache__/
+*.pyc
+
+# Datos y salidas (no se publican)
+datos/
+salidas/
+registros/
+temporal/
+res_prueba/
+*.mp4
+*.pt
+*.npy
+*.npz
+*.xlsx
+*.xlsm

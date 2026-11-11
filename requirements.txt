@@ -1,0 +1,15 @@
+# Python 3.11 (Windows). Versiones con las que se ejecutó el proyecto.
+numpy==2.4.6
+pandas==3.0.5
+scipy==1.17.1
+scikit-learn==1.9.1
+PyYAML==6.0.3
+opencv-python==5.0.0.93
+ultralytics==8.4.147
+lap==0.5.13
+torch==2.4.1
+torchvision==0.19.1
+torch-directml==0.2.5.dev240914   # GPU integrada en Windows; sin ella se usa la CPU
+timm==1.0.29
+matplotlib==3.11.1
+openpyxl==3.1.5                   # solo para crear los Excel de validación (etiquetado/src/crear_excel_validacion.py)
