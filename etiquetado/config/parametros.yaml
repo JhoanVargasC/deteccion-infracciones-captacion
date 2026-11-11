@@ -31,11 +31,11 @@ validacion:
     BAJA: descenso
     BAJA/SUBE: ambos
     SUBE/BAJA: ambos
-    SUBIDA: ascenso                       # variante usada por otra anotador
+    SUBIDA: ascenso                       # variante usada por otro anotador
     BAJADA: descenso
     SUBIDA/BAJADA: ambos
     BAJADA/SUBIDA: ambos
-  horas_vacias: ['-', '--', '—', 'NA', 'N/A', 'x', 'X']   # marcas que usan las anotadores para «sin hora»
+  horas_vacias: ['-', '--', '—', 'NA', 'N/A', 'x', 'X']   # marcas que usan los anotadores para «sin hora»
 
 clips_validacion:
   semilla: 20261106              # orden aleatorio reproducible de los clips

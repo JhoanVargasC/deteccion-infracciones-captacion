@@ -1,7 +1,8 @@
 # Detección de infracciones de tránsito asociadas a la captación de pasajeros
 
-Código de la tesis *Técnicas de visión computacional para la detección automática de infracciones de
-tránsito asociadas a la captación de pasajeros a través de señales visuales* (Universidad del Pacífico, 2026).
+Código del trabajo final del curso **Ingeniería de la Información II** (Universidad del Pacífico, 2026):
+*Técnicas de visión computacional para la detección automática de infracciones de tránsito asociadas a la
+captación de pasajeros a través de señales visuales*.
 
 El procedimiento detecta cuatro infracciones del Reglamento Nacional de Tránsito a partir del video de una
 cámara fija en la intersección de las avenidas Javier Prado Este y Paseo Parodi, en Lima:
@@ -36,6 +37,16 @@ parámetros. Ningún parámetro está escrito en el código.
 | G41 | vehículo | F1 | 0,970 | 0,970 | 0,971 |
 | M21 | detención | Precisión | 0,94 | 1,00 | 0,87 |
 | G08 | automóvil candidato (*test*) | AP (referencia) | 0,201 (0,026) | | |
+
+La validación por experto revisó 318 clips (254 casos anotados y 64 controles). Encontró un error en
+los casos de M21 y ninguno en las demás infracciones, por lo que las etiquetas de las cuatro se aceptan.
+
+## Documentación
+
+| Documento | Contenido |
+|---|---|
+| [`protocolo_anotacion/`](protocolo_anotacion/LEEME.md) | Protocolo de anotación: reglas comunes, un protocolo por infracción, plantillas de registro e imágenes de referencia de la escena |
+| [`ficha_conjunto_datos.md`](ficha_conjunto_datos.md) | Ficha del conjunto de datos: composición, recolección, anotación, validación, partición, usos y privacidad |
 
 ## Ejecución
 

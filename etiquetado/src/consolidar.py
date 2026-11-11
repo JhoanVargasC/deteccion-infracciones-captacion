@@ -1,7 +1,7 @@
-"""Junta las etiquetas válidas de todas las anotadores en una tabla por infracción.
+"""Junta las etiquetas válidas de todos los anotadores en una tabla por infracción.
 
-Entrada: salidas/<anotador>/etiquetas_<infraccion>.csv (de validar_anotaciones.py), para las
-anotadores de `consolidado.anotadores` en parametros.yaml. Una anotador puede limitarse a una
+Entrada: salidas/<anotador>/etiquetas_<infraccion>.csv (de validar_anotaciones.py), para los
+anotadores de `consolidado.anotadores` en parametros.yaml. Un anotador puede limitarse a una
 lista de videos (p. ej. anotador_a2).
 Salida en salidas/consolidado/:
   etiquetas_<infraccion>.csv   solo filas `ok`, con la columna `anotador`
