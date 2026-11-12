@@ -58,10 +58,14 @@ los casos de M21 y ninguno en las demás infracciones, por lo que las etiquetas 
 4. `entrenamiento/`: `python src/correr.py` (conjunto de datos, reglas de G10 y G41, y modelo de G08) y
    `python src/evaluar_m21.py` (regla de M21).
 
+## Video de validación visual
+
+[Video de 4 minutos](https://drive.google.com/file/d/16ZAoR0Cd-mw37AGDydFj3XhDTbHiiz0E/view?usp=sharing) con casos reales de cada infracción (aciertos y errores). Cada clip muestra el plano completo de la cámara, con las reglas y el modelo aplicados a todos los vehículos de la escena.
+
 ## Datos no incluidos
 
-Los videos, las hojas de anotación, las salidas intermedias y los pesos de YOLO26m no se incluyen, porque
-el video muestra rostros y placas de personas en la vía pública. Las rutas a esos datos se ajustan en el
+El video completo de las ocho horas, las hojas de anotación, las salidas intermedias y los pesos de YOLO26m no se incluyen, porque
+el video muestra rostros y placas de personas en la vía pública. El video de validación visual, con clips seleccionados, sí se publica. Las rutas a esos datos se ajustan en el
 `config/parametros.yaml` de cada carpeta.
 
 ## Entorno
