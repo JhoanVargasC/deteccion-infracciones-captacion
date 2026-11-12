@@ -11,10 +11,12 @@ Sobre las detenciones estrictas de vehículos que no son bus ni caja falsa, la r
   7. el vehículo no cambie de rumbo 45° o más con el frente a menos de 150 px del crucero.
 Ningún umbral usa etiquetas.
 
-Evaluación: se revisan visualmente todas las detenciones que señala la regla (precisión) y los eventos anotados
-(recall). Cada caso es un clip con el vehículo marcado (etiquetado/src/exportar_clips.py); los casos de ambas
-fuentes se presentan en orden aleatorio y con nombres neutros. El revisor responde si el vehículo cumple la
-definición: si, no o dudoso.
+Evaluación: la precisión tiene como referencia la revisión visual de todas las detenciones que señala la regla;
+el recall tiene como referencia la anotación: proporción de los eventos anotados que coinciden con una detención
+señalada del mismo vehículo. Como las dos medidas usan referencias distintas, no se combinan en un F1. Los
+intervalos de confianza son de Wilson al 95 %. Cada caso revisado es un clip con el vehículo marcado
+(etiquetado/src/exportar_clips.py), en orden aleatorio y con nombres neutros; el revisor responde si el vehículo
+cumple la definición: si, no o dudoso.
 
 Paso 1  python src/evaluar_m21.py --muestra    -> clips y hoja revision_m21.csv en rutas.verificacion_m21
 Paso 2  python src/evaluar_m21.py              -> rutas.resultados/m21/metricas_m21.json y .md
@@ -162,8 +164,14 @@ def respuestas(ruta):
     return pd.read_excel(ruta, dtype=str)
 
 
-def ic(y, fn, grupos):
-    return c.bootstrap(y, fn, c.P["reglas"]["bootstrap"], c.P["validacion"]["semilla"], grupos)
+def wilson(k, n, z=1.96):
+    """Intervalo de Wilson al 95 % para una proporción k/n."""
+    if n == 0:
+        return None
+    p = k / n
+    centro = (p + z * z / (2 * n)) / (1 + z * z / n)
+    radio = z * np.sqrt(p * (1 - p) / n + z * z / (4 * n * n)) / (1 + z * z / n)
+    return [round(float(centro - radio), 4), round(float(centro + radio), 4)]
 
 
 def main():
@@ -206,7 +214,6 @@ def main():
     x["si"] = x.m21.isin(["si", "sí"])
     x["decidido"] = x.m21 != "du"
     x["regla"] = [bool((d.regla & solapa(d, r_)).any()) for r_ in x.itertuples()]
-    x["regla_pasajeros"] = [bool((d.regla & d.pasajeros & solapa(d, r_)).any()) for r_ in x.itertuples()]
     x = x.merge(d[["video_id", "track_id", "k_ini", "k_fin", "periodo", "transito"]], how="left",
                 on=["video_id", "track_id", "k_ini", "k_fin"])
     x["vehiculo"] = x.video_id + "_" + x.track_id.astype(str)
@@ -221,38 +228,38 @@ def main():
            "senaladas_con_pasajeros": int((d.regla & d.pasajeros).sum()), "detenciones": int(len(d)), "senaladas_por_la_regla": int(d.regla.sum()),
            "senaladas_por_hora": round(d.regla.sum() / c.horas_video(d.video_id), 1),
            "dudosos": int((~x.decidido).sum()), "por_periodo": {}}
+    # precisión: detenciones señaladas, con la revisión visual como referencia
     for nombre, sel in (("global", np.ones(len(x), bool)), ("dia", (x.periodo == "dia").to_numpy()),
                         ("noche", (x.periodo == "noche").to_numpy())):
-        p = x[sel & x.fuente.str.contains("regla") & x.decidido].reset_index(drop=True)
-        q = x[sel & x.fuente.str.contains("anotacion") & x.decidido & x.si].reset_index(drop=True)
-        yp, yq = p.si.to_numpy(), q.regla.to_numpy()
-        P_ = float(yp.mean()) if len(p) else None
-        R_ = float(yq.mean()) if len(q) else None
-        res["por_periodo"][nombre] = {
-            "precision": P_, "ic95_precision": ic(yp, lambda i: yp[i].mean(), p.vehiculo.to_numpy()) if len(p) else None,
-            "n_senaladas_revisadas": int(len(p)),
-            "recall": R_, "ic95_recall": ic(yq, lambda i: yq[i].mean(), q.vehiculo.to_numpy()) if len(q) else None,
-            "anotaciones_confirmadas": int(len(q)),
-            "f1": round(2 * P_ * R_ / (P_ + R_), 4) if P_ and R_ else None}
-    # variante con pasajeros: la parte de la muestra de la regla que también tiene personas junto al vehículo
-    p = x[x.fuente.str.contains("regla") & x.decidido & x.regla_pasajeros]
-    q = x[x.fuente.str.contains("anotacion") & x.decidido & x.si]
-    res["con_pasajeros"] = {"precision": float(p.si.mean()) if len(p) else None, "n_muestra": int(len(p)),
-                            "recall": float(q.regla_pasajeros.mean()) if len(q) else None}
-    an = x[x.fuente.str.contains("anotacion") & x.decidido]
-    res["anotaciones_que_no_cumplen_la_definicion"] = int((~an.si).sum())
-    res["anotaciones_revisadas"] = int(len(an))
+        p = x[sel & x.fuente.str.contains("regla") & x.decidido]
+        res["por_periodo"][nombre] = {"senaladas_decididas": int(len(p)), "confirmadas": int(p.si.sum()),
+                                      "precision": float(p.si.mean()) if len(p) else None,
+                                      "ic95_precision": wilson(int(p.si.sum()), len(p))}
+    # recall: eventos anotados, con la anotación como referencia
+    an = c.etiquetas("M21")
+    encontrados = [bool((d.regla & solapa(d, r_)).any()) for r_ in an.itertuples()]
+    k, n = int(sum(encontrados)), len(an)
+    res["recall"] = {"eventos_anotados": n, "encontrados": k, "recall": k / n if n else None, "ic95_recall": wilson(k, n)}
+    # detenciones confirmadas que coinciden con un evento anotado de la infracción M21 o de la infracción G08
+    conf = x[x.fuente.str.contains("regla") & x.si]
+    g08 = c.etiquetas("G08")
+    res["confirmadas_con_anotacion_m21"] = int(sum(bool(solapa(an, r_).any()) for r_ in conf.itertuples()))
+    res["confirmadas_con_evento_g08"] = int(sum(bool(solapa(g08, r_).any()) and not bool(solapa(an, r_).any())
+                                                for r_ in conf.itertuples()))
+    res["confirmadas_con_pasajeros"] = int(sum(bool((d.pasajeros & solapa(d, r_)).any()) for r_ in conf.itertuples()))
     c.guardar_json(res, out / "metricas_m21.json")
     filas = [{"periodo": k, **{kk: vv for kk, vv in v.items()}} for k, v in res["por_periodo"].items()]
     txt = ["# Evaluación de la regla M21", "",
            f"Regla: {res['regla']} (θ = {res['theta']}, T = {res['T_s']} s). Señala {res['senaladas_por_la_regla']} de "
            f"{res['detenciones']} detenciones ({res['senaladas_por_hora']} por hora).", "",
-           "Precisión: detenciones señaladas por la regla, revisadas visualmente. Recall: eventos anotados que la "
-           "revisión confirma. La hoja de revisión no indica de dónde sale cada caso.", "",
+           "Precisión: detenciones señaladas por la regla, con la revisión visual como referencia. Recall: eventos "
+           "anotados que coinciden con una detención señalada, con la anotación como referencia. Intervalos de Wilson.", "",
            c.markdown(pd.DataFrame(filas)), "",
-           f"Anotaciones revisadas: {res['anotaciones_revisadas']}; no cumplen la definición: "
-           f"{res['anotaciones_que_no_cumplen_la_definicion']}. Casos dudosos (fuera del cálculo): {res['dudosos']}.", "",
-           f"Variante con pasajeros ({res['senaladas_con_pasajeros']} detenciones): {res['con_pasajeros']}."]
+           f"Recall: {res['recall']['encontrados']} de {res['recall']['eventos_anotados']} eventos anotados "
+           f"= {res['recall']['recall']:.2f} (IC 95 %: {res['recall']['ic95_recall']}).",
+           f"Casos sin decisión (fuera de la precisión): {res['dudosos']}.",
+           f"Confirmadas: {res['confirmadas_con_anotacion_m21']} con una anotación de M21, "
+           f"{res['confirmadas_con_evento_g08']} con un evento de G08 y {res['confirmadas_con_pasajeros']} con personas que suben o bajan."]
     (out / "metricas_m21.md").write_text("\n".join(txt) + "\n", encoding="utf-8")
     print("\n".join(txt))
 
